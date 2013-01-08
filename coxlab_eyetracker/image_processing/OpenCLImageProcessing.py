@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import pyopencl as cl
 import numpy
-from stopwatch import *
 import mako.template
 mf = cl.mem_flags
 

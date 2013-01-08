@@ -10,12 +10,11 @@
 
 from numpy import *
 # from EdgeDetection import *
-from stopwatch import *
 from EyeFeatureFinder import *
 from scipy.weave import inline
 # from scipy.weave import converters
 import scipy.optimize
-from coxlab_eyetracker.util import *
+#from coxlab_eyetracker.util import *
 
 from WovenBackend import *
 
@@ -25,7 +24,7 @@ class SubpixelStarburstEyeFeatureFinder(EyeFeatureFinder):
     def __init__(self, **kwargs):
         self.parameters_updated = False
 
-        self.backend = WovenBackend()
+        self.backend = kwargs.get('backend_class', WovenBackend)()
 
         self.shortcut_sobel = kwargs.get('shortcut_sobel', None)
 

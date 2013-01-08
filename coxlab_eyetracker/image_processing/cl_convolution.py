@@ -2,7 +2,6 @@
 import pyopencl as cl
 import numpy
 from numpy.random import rand
-from stopwatch import *
 import mako.template
 mf = cl.mem_flags
 

@@ -4,17 +4,18 @@
 
 from numpy import *
 from EyeFeatureFinder import *
-from stopwatch import *
 from VanillaBackend import *
 from WovenBackend import *
+from CythonBackend import *
 
 
 class FastRadialFeatureFinder(EyeFeatureFinder):
 
-    def __init__(self):
+    def __init__(self, backend_class=WovenBackend):
 
+        self.backend = backend_class()
         # self.backend = VanillaBackend()
-        self.backend = WovenBackend()
+        # self.backend = WovenBackend()
         # self.backend = OpenCLBackend()
 
         self.target_kpixels = 80.0  # 8.0
@@ -112,7 +113,8 @@ class FastRadialFeatureFinder(EyeFeatureFinder):
         if self.albino_mode:
             (pupil_coords, cr_coords) = self.find_albino_features(S, im_array)
         else:
-            (pupil_coords, cr_coords) = self.backend.find_minmax(S)
+            #(pupil_coords, cr_coords) = self.backend.find_minmax(S)
+            (cr_coords, pupil_coords) = self.backend.find_minmax(S)
 
         if pupil_coords == None:
             pupil_coords = array([0., 0.])

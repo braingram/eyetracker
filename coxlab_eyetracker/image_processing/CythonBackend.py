@@ -6,9 +6,14 @@ import scipy
 from scipy.signal import sepfir2d, convolve2d
 from stopwatch import clockit
 import numpy
+import cython
+
+import pyximport
+pyximport.install(setup_args=dict(include_dirs=[numpy.get_include()]))
+import cutils
 
 
-class VanillaBackend(ImageProcessingBackend):
+class CythonBackend(ImageProcessingBackend):
 
     #@clockit : 0.0007
     def sobel3x3(self, im, **kwargs):
@@ -58,10 +63,6 @@ class VanillaBackend(ImageProcessingBackend):
         else:
             (mag, imgx, imgy) = self.sobel3x3(image)
 
-        #print "SM:", mag.shape, mag.max(), mag.min()
-        #print "SX:", imgx.shape, imgx.max(), imgx.min()
-        #print "SY:", imgy.shape, imgy.max(), imgy.min()
-
         # Normalise gradient values so that [imgx imgy] form unit
         # direction vectors.
         imgx = imgx / mag
@@ -99,96 +100,14 @@ class VanillaBackend(ImageProcessingBackend):
             negy = negy.round().astype(int)
 
             # Clamp coordinate values to range [1 rows 1 cols]
-            #posx[where(posx < 0)] = 0
-            #posx[where(posx > cols - 1)] = cols - 1
-            #posy[where(posy < 0)] = 0
-            #posy[where(posy > rows - 1)] = rows - 1
+            O, M = cutils.calculate_O_and_M(O, M, posx, \
+                    posy, negx, negy, mag)
 
-            #negx[where(negx < 0)] = 0
-            #negx[where(negx > cols - 1)] = cols - 1
-            #negy[where(negy < 0)] = 0
-            #negy[where(negy > rows - 1)] = rows - 1
-
-            #for r in range(0, rows):
-            #    for c in range(0, cols):
-            #        O[posy[r, c], posx[r, c]] += 1
-            #        O[negy[r, c], negx[r, c]] -= 1
-            #        M[posy[r, c], posx[r, c]] += mag[r, c]
-            #        M[negy[r, c], negx[r, c]] -= mag[r, c]
-            mask = ~((posx < 0) | (posx > (cols - 1)) | (posy < 0) | \
-                    (posy > (rows - 1)) | (negx < 0) | (negx > (cols - 1)) | \
-                    (negy < 0) | (negy > (rows - 1)))
-            #pm = ((posx > -1) & (posx < cols) & (posy > -1) & (posy < rows))
-            #nm = ((negx > -1) & (negx < cols) & (negy > -1) & (negy < rows))
-            # DOES NOT WORK WITH REPEATS
-            #O[posy[mask].flatten(), posx[mask].flatten()] += 1
-            #O[negy[mask].flatten(), negx[mask].flatten()] -= 1
-            #M[posy[mask].flatten(), posx[mask].flatten()] += \
-            #        mag[posy[mask].flatten(), posx[mask].flatten()]
-            #M[negy[mask].flatten(), negx[mask].flatten()] -= \
-            #        mag[negy[mask].flatten(), negx[mask].flatten()]
-            # 1.8 seconds
-            #for (px, py, nx, ny, m) in itertools.izip( \
-            #        posx[mask].flat, posy[mask].flat, \
-            #        negx[mask].flat, negy[mask].flat, \
-            #        mag[mask].flat):
-            #    # 15% of time
-            #    O[py, px] += 1
-            #    # 15% of time
-            #    O[ny, nx] -= 1
-            #    # 11% of time
-            #    M[py, px] += m
-            #    # 11% of time
-            #    M[ny, nx] -= m
-            # 22%
-            pH, _, _ = numpy.histogram2d(posy[mask], posx[mask], posy.shape)
-            # 22%
-            pM, _, _ = numpy.histogram2d(posy[mask], posx[mask], posy.shape,
-                    weights=mag[mask])
-            # 22%
-            nH, _, _ = numpy.histogram2d(negy[mask], negx[mask], negy.shape)
-            # 22%
-            nM, _, _ = numpy.histogram2d(negy[mask], negx[mask], negy.shape,
-                    weights=mag[mask])
-            O = pH - nH
-            M = pM - nM
-
-            #MM = zeros_like(image)
-            #OO = zeros_like(image)
-            # 1.3 seconds?
-            #for (px, py, nx, ny, m) in itertools.izip( \
-            #        posx.flat, posy.flat, negx.flat, negy.flat, \
-            #        mag.flat):
-            #    # 38% of time !!!!
-            #    if px < 0 or px > (cols - 1) or py < 0 or py > (rows - 1) \
-            #        or nx < 0 or nx > (cols - 1) or ny < 0 or ny > (rows - 1):
-            #        continue
-            #    # 15% of time
-            #    OO[py, px] += 1
-            #    # 15% of time
-            #    OO[ny, nx] -= 1
-
-            #    # 11% of time
-            #    MM[py, px] += m
-            #    # 11% of time
-            #    MM[ny, nx] -= m
-            #print 'O', O.shape, O.max(), O.min()
-            #print O[:3, :3]
-            #print O[-3:, -3:]
-            #print 'M', M.shape, M.max(), M.min()
-            #print M[:3, :3]
-            #print M[-3:, -3:]
-
-            #if any(abs(O - OO) > 1.) or any(abs(M - MM) > 1.):
-            #    raise Exception
             O[where(O > kappa)] = kappa
             O[where(O < -kappa)] = -kappa
-            #print 'O', O.shape, O.max(), O.min()
 
             # Unsmoothed symmetry measure at this radius value
-            F = M / kappa * (abs(O) / kappa) ** alpha
-            #print "-- Radius: %i --" % n
-            #print "F:", F.shape, F.max(), F.min()
+            F = M / kappa * (numpy.abs(O) / kappa) ** alpha
 
             # Generate a Gaussian of size proportional to n to smooth
             # and spread
@@ -203,12 +122,9 @@ class VanillaBackend(ImageProcessingBackend):
             gauss1d = scipy.signal.gaussian(width, 0.25 * n)
 
             thisS = self.separable_convolution2d(F, gauss1d, gauss1d)
-            #print "S:", thisS.shape, thisS.max(), thisS.min()
             S += thisS
-            #print "S:", S.shape, S.max(), S.min()
 
         S = S / len(radii)  # Average
-        #print "S:", S.shape, S.max(), S.min()
 
         return S
 

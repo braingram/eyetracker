@@ -3,7 +3,6 @@ import pycuda.driver as cuda
 import pycuda.compiler as cuda_compiler 
 import numpy
 from numpy.random import rand
-from stopwatch import *
 import mako.template
 
 class NoProgramToFreezeException (Exception):
