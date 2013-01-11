@@ -229,9 +229,9 @@ class EyeTrackerGUI:
         #    max=250,
         #    )
         # self.led_bar.add_var('Channel3/Ch3_status', label='Ch3 status',
-        #                              vtype=atb.TW_TYPE_BOOL8,
-        #                              getter=lambda: c.leds.soft_status(3),
-        #                              setter=lambda x: c.leds.set_status(3, x))
+        #                          vtype=atb.TW_TYPE_BOOL8,
+        #                          getter=lambda: c.leds.soft_status(3),
+        #                          setter=lambda x: c.leds.set_status(3, x))
         #
         #         self.led_bar.add_var(
         #             'Channel4/Ch4_mA',
@@ -242,10 +242,11 @@ class EyeTrackerGUI:
         #             min=0,
         #             max=250,
         #             )
-        #         self.led_bar.add_var('Channel4/Ch4_status', label='Ch4 status',
-        #                              vtype=atb.TW_TYPE_BOOL8,
-        #                              getter=lambda: c.leds.soft_status(4),
-        #                              setter=lambda x: c.leds.set_status(4, x))
+        #         self.led_bar.add_var('Channel4/Ch4_status',
+        #                          label='Ch4 status',
+        #                          vtype=atb.TW_TYPE_BOOL8,
+        #                          getter=lambda: c.leds.soft_status(4),
+        #                          setter=lambda x: c.leds.set_status(4, x))
 
         # ---------------------------------------------------------------------
         #   RADIAL FEATURE FINDER
@@ -382,7 +383,8 @@ class EyeTrackerGUI:
             name='StarburstFF',
             label='Starburst',
             iconified='true',
-            help="Parameters for the refinement phase ('starburst') image processing",
+            help="Parameters for the refinement phase ('starburst') " \
+            "image processing",
             position=(40, 40),
             size=(200, 250),
             )
@@ -496,7 +498,8 @@ class EyeTrackerGUI:
                                 c.calibrate_center_vertical(),
                                 label='Center Vertical')
         self.cal_bar.add_button('cal_center_d', lambda: \
-                                c.calibrate_center_depth(), label='Center Depth'
+                                c.calibrate_center_depth(), \
+                                label='Center Depth'
                                 )
         #self.cal_bar.add_button('align_pupil_cr', lambda: \
         #                        c.calibrate_align_pupil_and_cr(),
@@ -525,9 +528,13 @@ class EyeTrackerGUI:
                                  self.get_calibration_file_atb(),
                                  setter=lambda x: \
                                  self.set_calibration_file_atb(x))
-                                  # setter = lambda x: sb_ff.__dict__.__setitem__('fitting_algorithm', fit_algos[x]))
-                                  # getter=lambda: self.get_calibration_file_atb,
-                                  # setter=lambda x: self.set_calibration_file_atb(x))
+                                  # setter=lambda x: \
+                                  #        sb_ff.__dict__.__setitem__( \
+                                  #        'fitting_algorithm', fit_algos[x]))
+                                  # getter=lambda: \
+                                  #        self.get_calibration_file_atb,
+                                  # setter=lambda x: \
+                                  #        self.set_calibration_file_atb(x))
 
             self.cal_bar.add_separator('Calibration Save')
             self.cal_file_save_name = ctypes.c_char_p('')
@@ -536,7 +543,8 @@ class EyeTrackerGUI:
                                  vtype=atb.TW_TYPE_CDSTRING, target=self,
                                  attr='cal_file_save_name')
             self.cal_bar.add_button('save_calibration', lambda: \
-                                    self.save_calibration_file_atb(self.cal_file_save_name))
+                                    self.save_calibration_file_atb( \
+                                    self.cal_file_save_name))
         except Exception as E:
             logging.warning("Error setting calibration file list: %s" % E)
             logging.warning("""Unable to use calibration-file saving
@@ -681,7 +689,8 @@ class EyeTrackerGUI:
         if self.controller.calibration_file is None:
             calibration_filename = None
         else:
-            calibration_filename = os.path.split(self.controller.calibration_file)[-1]
+            calibration_filename = os.path.split( \
+                    self.controller.calibration_file)[-1]
             calibration_filename = os.path.splitext(calibration_filename)[0]
         return self.cal_enum_dict.get(calibration_filename, 0)
 
@@ -703,7 +712,8 @@ class EyeTrackerGUI:
         try:
             cal_path = os.path.expanduser(global_settings['calibration_path'])
         except KeyError:
-            logging.warning('A calibration_path was not found in the config file')
+            logging.warning(\
+                    'A calibration_path was not found in the config file')
             logging.warning('Loaded global settings: %s' % global_settings)
 
         if not os.path.exists(cal_path):
@@ -737,7 +747,8 @@ class EyeTrackerGUI:
         self.refresh_calibration_file_list()
 
     def update_tracker_view(self):
-        if (self.controller is None) or (self.controller.camera_device is None):
+        if (self.controller is None) or \
+                (self.controller.camera_device is None):
             return
 
         try:
@@ -765,7 +776,8 @@ class EyeTrackerGUI:
                 features['pupil_position_stage1']
 
         if 'cr_position_stage1' in features:
-            self.tracker_view.stage1_cr_position = features['cr_position_stage1'
+            self.tracker_view.stage1_cr_position = \
+                    features['cr_position_stage1'
                     ]
 
         if 'cr_radius' in features:
@@ -785,7 +797,8 @@ class EyeTrackerGUI:
         else:
             self.tracker_view.starburst = None
 
-        self.tracker_view.is_calibrating = features.get('is_calibrating', False)
+        self.tracker_view.is_calibrating = \
+                features.get('is_calibrating', False)
 
         self.tracker_view.restrict_top = features.get('restrict_top', None)
         self.tracker_view.restrict_bottom = features.get('restrict_bottom',

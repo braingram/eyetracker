@@ -18,10 +18,7 @@ import prosilica as p
 from numpy import *
 #import matplotlib.pylab as pylab
 
-import os
 import time
-
-import PIL.Image
 
 import threading
 
@@ -76,15 +73,19 @@ class ProsilicaCameraDevice:
         self.camera.setAttribute("BinningX", 1)
         self.camera.setAttribute("BinningY", 1)
         try:
-            self.timestampFrequency = self.camera.getUint32Attribute("TimeStampFrequency")
+            self.timestampFrequency = \
+                    self.camera.getUint32Attribute("TimeStampFrequency")
             print "Found TimestampFrequency of: %f" % self.timestampFrequency
         except:
             self.timestampFrequency = 1
-            print "attribute: TimestampFrequency not found for camera, defaulting to 1"
+            print "attribute: TimestampFrequency not found for camera, " \
+            "defaulting to 1"
         self.camera.startContinuousCapture()
 
         if(self.acquire_continuously):
-            self.acquisition_thread = threading.Thread(target=acquireContinuously, args=[self.camera, self.feature_finder])
+            self.acquisition_thread = threading.Thread( \
+                    target=acquireContinuously, \
+                    args=[self.camera, self.feature_finder])
             self.acquisition_thread.start()
 
     def shutdown(self):
@@ -103,19 +104,20 @@ class ProsilicaCameraDevice:
         if(self.camera != None):
             self.camera.endCapture()
 
-
     def acquire_image(self):
 
         if(self.acquire_continuously):
             return
 
         if(self.camera == None):
-            raise Exception, "No valid prosilica camera is in place"
+            raise Exception("No valid prosilica camera is in place")
 
         frame = self.camera.getAndLockCurrentFrame()
         self.im_array = (asarray(frame)).copy()
-        # We could convert the timestamp from clock cycles to seconds by dividing by the available timestampFrequency
-        # However, this could result in rounding errors. It might be easier to account for this in analysis scripts
+        # We could convert the timestamp from clock cycles to seconds
+        # by dividing by the available timestampFrequency
+        # However, this could result in rounding errors. It might be easier
+        # to account for this in analysis scripts
         # or pass along timestampFrequency
         timestamp = frame.timestamp / float(self.timestampFrequency)
         #timestamp = frame.timestamp
@@ -128,26 +130,26 @@ class ProsilicaCameraDevice:
         #self.feature_finder.analyze_image(self.im_array.copy(), None)
 
         # push the image to the feature analyzer
-        self.feature_finder.analyze_image(self.im_array.astype(float32), {"pupil_position":self.pupil_position, "cr_position": self.cr_position, "frame_number" : self.frame_number, "timestamp" : timestamp})
+        self.feature_finder.analyze_image(self.im_array.astype(float32), \
+                {"pupil_position": self.pupil_position, \
+                "cr_position": self.cr_position, \
+                "frame_number": self.frame_number, \
+                "timestamp": timestamp})
         return
 
-
-
-    def get_processed_image(self, guess = None):
+    def get_processed_image(self, guess=None):
 
         features = self.feature_finder.get_result()
 
         if(features == None):
             return features
 
-        if(features.has_key('pupil_position')):
+        if 'pupil_position' in features.keys():
             self.pupil_position = features['pupil_position']
 
-        if(features.has_key('cr_position')):
+        if 'cr_position' in features.keys():
             self.cr_position = features['cr_position']
 
         self.nframes_done += 1
         #features["frame_number"] = self.frame_number
         return features
-
-
