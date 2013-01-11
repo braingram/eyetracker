@@ -22,6 +22,10 @@ import time
 
 import threading
 
+from ..utils.loghelper import make_logger
+
+log = make_logger('camera')
+
 
 def acquire_continuously(camera, ff):
     while(1):
@@ -55,7 +59,7 @@ class ProsilicaCameraDevice:
         p.PvUnInitialize()
         p.PvInitialize()
 
-        print "Finding valid cameras..."
+        log.info("Finding valid cameras...")
         time.sleep(1)
         camera_list = p.getCameraList()
 
@@ -63,11 +67,11 @@ class ProsilicaCameraDevice:
             raise Exception("Couldn't find a valid camera")
 
         try:
-            print "Trying..."
+            log.info("Trying...")
             self.camera = p.ProsilicaCamera(camera_list[0])
-            print "Did it"
+            log.info("Did it")
         except:
-            print "No good"
+            log.info("No good")
             raise Exception("Couldn't instantiate camera")
 
         self.camera.setAttribute("BinningX", 1)
@@ -75,11 +79,12 @@ class ProsilicaCameraDevice:
         try:
             self.timestampFrequency = \
                     self.camera.getUint32Attribute("TimeStampFrequency")
-            print "Found TimestampFrequency of: %f" % self.timestampFrequency
+            log.debug("Found TimestampFrequency of: %f" % \
+                    self.timestampFrequency)
         except:
             self.timestampFrequency = 1
-            print "attribute: TimestampFrequency not found for camera, " \
-            "defaulting to 1"
+            log.warning("attribute: TimestampFrequency not found for " \
+                    "camera, defaulting to 1")
         self.camera.startContinuousCapture()
 
         if(self.acquire_continuously):
@@ -89,16 +94,17 @@ class ProsilicaCameraDevice:
             self.acquisition_thread.start()
 
     def shutdown(self):
-        print "Deleting camera (in python)"
+        log.debug("Deleting camera (in python)")
         if(self.acquire_continuously):
-            print "Terminating acquisition thread in ProsilicaCameraDevice"
+            log.debug("Terminating acquisition thread in " \
+                    "ProsilicaCameraDevice")
             self.acquisition_thread.terminate()
         if(self.camera != None):
-            print "ending camera capture in ProsilicaCameraDevice"
+            log.debug("ending camera capture in ProsilicaCameraDevice")
             self.camera.endCapture()
 
     def __del__(self):
-        print "Deleting camera (in python)"
+        log.debug("Deleting camera (in python)")
         if(self.acquire_continuously):
             self.acquisition_thread.terminate()
         if(self.camera != None):

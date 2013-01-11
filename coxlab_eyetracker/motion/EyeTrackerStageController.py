@@ -80,7 +80,9 @@ class EyeTrackerStageController:
     # without actually going there
     # ===================
     def precompute_return_motion(self):
-        """Returns a function that will always return the stages to their current positions
+        """
+        Returns a function that will always return the stages to \
+                their current positions
         """
 
         x = self.current_position(self.x_axis)
@@ -104,7 +106,8 @@ class EyeTrackerStageController:
         x_abs = x0_abs - d * sin(r0_abs * math.pi / 180) + d * cos(r0_abs
                 * math.pi / 180) * tan(r_abs * math.pi / 180)
 
-        # Compute the new distance of the rotation center from the camera (following the current relative rotation)
+        # Compute the new distance of the rotation center from the camera \
+        #        (following the current relative rotation)
         d_new = d * cos(r0_abs * math.pi / 180) / cos(r_abs * math.pi / 180)
 
         # Move the axes
@@ -115,9 +118,12 @@ class EyeTrackerStageController:
     # Composite motions
     # ===================
 
-    # Make an ABSOLUTE composite (rotation + x translation) movement about a point some distance away from the origin of the stages.
-    # NOTE: this is an ABSOLUTE displacement. This means that the center of rotation entered by the user (i.e., "d") is always measured relative to the origin,
-    # no matter what the current position/rotation of the x stage and rotary stage is.
+    # Make an ABSOLUTE composite (rotation + x translation) movement about a
+    # point some distance away from the origin of the stages.
+    # NOTE: this is an ABSOLUTE displacement. This means that the center of
+    # rotation entered by the user (i.e., "d") is always measured relative to
+    # the origin, no matter what the current position/rotation of the x stage
+    # and rotary stage is.
     def composite_rotation_absolute(self, d, r):
         r = float(r)
         d = float(d)
@@ -130,7 +136,8 @@ class EyeTrackerStageController:
         self.controller.move_composite_absolute((self.x_axis, self.r_axis), (x,
                 r))
 
-    # Make a RELATIVE composite (rotation + x translation) movement about a point some distance away from the original of the stages.
+    # Make a RELATIVE composite (rotation + x translation) movement about a
+    # point some distance away from the original of the stages.
     def composite_rotation_relative(self, d, r_rel):
         r_rel = float(r_rel)
         d = float(d)
@@ -150,14 +157,17 @@ class EyeTrackerStageController:
         self.controller.move_composite_absolute((self.x_axis, self.r_axis),
                 (x_abs, r_abs))
 
-        # Compute the new distance of the rotation center from the camera (following the current relative rotation)
+        # Compute the new distance of the rotation center from the camera
+        # (following the current relative rotation)
         d_new = d * cos(r0_abs * math.pi / 180) / cos(r_abs * math.pi / 180)
 
         # return a function call to undo this movement
-        return (d_new, lambda: self.controller.move_composite_absolute((self.x_axis, self.r_axis),
-                                                                       (x0_abs, r0_abs)))
+        return (d_new, lambda: \
+                self.controller.move_composite_absolute( \
+                (self.x_axis, self.r_axis), (x0_abs, r0_abs)))
 
-    # Make a RELATIVE composite (rotation + x translation) movement about a point some distance away from the original of the stages.
+    # Make a RELATIVE composite (rotation + x translation) movement about a
+    # point some distance away from the original of the stages.
     def composite_rotation_relative_old(self, d, r):
         r = float(r)
         d = float(d)
@@ -185,8 +195,9 @@ class EyeTrackerStageController:
                 (Dx, Dr))
 
         # return a function call to undo this movement
-        return lambda: self.controller.move_composite_relative((self.x_axis, self.r_axis),
-                                                               (-Dx, -Dr))
+        return lambda: \
+                self.controller.move_composite_relative( \
+                (self.x_axis, self.r_axis), (-Dx, -Dr))
 
     def power_down_all(self):
         self.power_down(self.x_axis)

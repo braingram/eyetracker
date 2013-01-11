@@ -43,7 +43,8 @@ class TrackerView:
 
     def prepare_opengl(self):
 
-        # self.openGLContext().setValues_forParameter_([1], NSOpenGLCPSwapInterval)
+        # self.openGLContext().setValues_forParameter_([1], \
+        #        NSOpenGLCPSwapInterval)
 
         glEnable(GL_BLEND)
         glEnable(GL_TEXTURE_2D)
@@ -157,13 +158,13 @@ class TrackerView:
             glDeleteTextures(self.texture)
 
     def render_stage1_pupil_location(self):
-        self.render_crosshairs(self.__image_coords_to_texture_coords(self.stage1_pupil_position),
-                               (1., 0., 0., 0.5), 0.02, 0.002)
+        self.render_crosshairs(self.__image_coords_to_texture_coords( \
+                self.stage1_pupil_position), (1., 0., 0., 0.5), 0.02, 0.002)
         return
 
     def render_stage1_CR_location(self):
-        self.render_crosshairs(self.__image_coords_to_texture_coords(self.stage1_cr_position),
-                               (0., 0., 1., 0.5), 0.02, 0.002)
+        self.render_crosshairs(self.__image_coords_to_texture_coords( \
+                self.stage1_cr_position), (0., 0., 1., 0.5), 0.02, 0.002)
         return
 
     def render_pupil_location(self):
@@ -173,12 +174,18 @@ class TrackerView:
             radius = 10
         # print self.im_array.shape = 120, 160
         # print self.__image_length_to_texture_length(60.0) = 0.5, 0.375
-        # self.render_circle(self.__image_coords_to_texture_coords((60.0,80.0)), self.__image_length_to_texture_length(60.0), (0., 1., 0.), 0.004)
-        # self.render_crosshairs(self.__image_coords_to_texture_coords(self.pupil_position), (0.,1.,0.5), 0.06, 0.002)
-        self.render_circle(self.__image_coords_to_texture_coords(self.pupil_position),
-                           self.__image_length_to_texture_length(radius), (1.,
-                           0., 0.), 0.0040000000000000001)
-        # self.render_crosshairs(self.__image_coords_to_texture_coords(self.pupil_position),  (1.,0.,0.0), self.__image_length_to_texture_length(radius), 0.002)
+        # self.render_circle(self.__image_coords_to_texture_coords( \
+        #        (60.0,80.0)), self.__image_length_to_texture_length(60.0), \
+        #        (0., 1., 0.), 0.004)
+        # self.render_crosshairs(self.__image_coords_to_texture_coords( \
+        #        self.pupil_position), (0.,1.,0.5), 0.06, 0.002)
+        self.render_circle(self.__image_coords_to_texture_coords( \
+                self.pupil_position), \
+                self.__image_length_to_texture_length(radius), \
+                (1., 0., 0.), 0.0040000000000000001)
+        # self.render_crosshairs(self.__image_coords_to_texture_coords( \
+        #        self.pupil_position),  (1.,0.,0.0), \
+        #        self.__image_length_to_texture_length(radius), 0.002)
 
         return
 
@@ -187,11 +194,15 @@ class TrackerView:
             radius = self.cr_radius
         else:
             radius = 10
-#        self.render_crosshairs(self.__image_coords_to_texture_coords(self.cr_position), (1.,1.,0.5), 0.06, 0.002)
-        self.render_circle(self.__image_coords_to_texture_coords(self.cr_position),
-                           self.__image_length_to_texture_length(radius), (0.,
-                           0., 1.), 0.0040000000000000001)
-        # self.render_crosshairs(self.__image_coords_to_texture_coords(self.cr_position),(0.,0.,1.), self.__image_length_to_texture_length(radius), .002)
+#        self.render_crosshairs(self.__image_coords_to_texture_coords(\
+        #           self.cr_position), (1.,1.,0.5), 0.06, 0.002)
+        self.render_circle(self.__image_coords_to_texture_coords( \
+                self.cr_position), \
+                self.__image_length_to_texture_length(radius), \
+                (0., 0., 1.), 0.0040000000000000001)
+        # self.render_crosshairs(self.__image_coords_to_texture_coords( \
+        #        self.cr_position),(0.,0.,1.), \
+        #        self.__image_length_to_texture_length(radius), .002)
 
         return
 
@@ -345,9 +356,9 @@ class TrackerView:
         cr_rays_end = starburst['cr_rays_end']
         cr_boundary = starburst['cr_boundary']
 
-        if pupil_rays_start == None or pupil_rays_end == None or pupil_boundary \
-            == None or cr_rays_start == None or cr_rays_end == None \
-            or cr_boundary == None:
+        if (pupil_rays_start == None) or (pupil_rays_end == None) \
+                or (pupil_boundary == None) or (cr_rays_start == None) \
+                or cr_rays_end == None or cr_boundary == None:
             return
 
         if len(pupil_rays_start) == 0 and len(pupil_rays_end) == 0 \
@@ -361,7 +372,8 @@ class TrackerView:
         glColor((0., 0.8, 0., 1.))
 
         for i in range(0, len(pupil_rays_start)):
-            # NSLog("pupil ray: %f, %f" % (pupil_rays_start[i][0], pupil_rays_start[i][1]))
+            # NSLog("pupil ray: %f, %f" % (pupil_rays_start[i][0], \
+            #        pupil_rays_start[i][1]))
             # NSLog("\t%f, %f" % (pupil_rays_end[i][0], pupil_rays_end[i][1]))
             ray_start = \
                 self.__image_coords_to_texture_coords(pupil_rays_start[i])
@@ -370,7 +382,8 @@ class TrackerView:
             glVertex3f(ray_end[0], ray_end[1], 0.)
 
         for i in range(0, len(cr_rays_start)):
-            # NSLog("cr ray: %f, %f" % (cr_rays_start[i][0], cr_rays_start[i][1]))
+            # NSLog("cr ray: %f, %f" % (cr_rays_start[i][0], \
+            #        cr_rays_start[i][1]))
             # NSLog("\t%f, %f" % (cr_rays_end[i][0], cr_rays_end[i][1]))
             ray_start = self.__image_coords_to_texture_coords(cr_rays_start[i])
             ray_end = self.__image_coords_to_texture_coords(cr_rays_end[i])
@@ -394,5 +407,3 @@ class TrackerView:
             bound = self.__image_coords_to_texture_coords(cr_boundary[i])
             glVertex3f(bound[0], bound[1], 0.)
         glEnd()
-
-

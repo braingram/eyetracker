@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from ctypes import *
-import logging
 import sys
 
 import time
@@ -20,11 +19,16 @@ from coxlab_eyetracker.motion import *
 from coxlab_eyetracker.calibrator import *
 from settings import global_settings
 
+
+from .util.loghelper import make_logger
+
+log = make_logger('controller')
+
 # load settings
 loaded_config = load_config_file('~/.eyetracker/config.ini')
 global_settings.update(loaded_config)
 
-print global_settings
+log.info('global_settings %s' % (global_settings, ))
 
 # boost.python wrapper for a MWorks interprocess conduit, if you're into
 # that sort of thing
@@ -39,7 +43,7 @@ if global_settings.get('enable_mw_conduit', True):
         TRACKER_INFO = 101
         mw_enabled = True
     except Exception, e:
-        print 'Unable to load MW conduit: %s' % e
+        log.critical('Unable to load MW conduit: %s' % e)
 
 
 # A decorator for calibration steps (stop continuous execution, resume on ret.)
@@ -128,8 +132,9 @@ class EyeTrackerController(object):
 
         self.calibrating = False
 
-        self.enable_save_to_disk = global_settings.get('enable_save_to_disk', False)
-        print "Save to disk?:", self.enable_save_to_disk
+        self.enable_save_to_disk = \
+                global_settings.get('enable_save_to_disk', False)
+        log.info("Save to disk?: %s" % (self.enable_save_to_disk, ))
         self.image_save_dir = global_settings.get('data_dir', None)
 
         self.use_simulated = global_settings.get('use_simulated', False)
@@ -140,7 +145,7 @@ class EyeTrackerController(object):
         # Stages
         # -------------------------------------------------------------
 
-        logging.info('Initializing Motion Control Subsystem (Stages)...')
+        log.info('Initializing Motion Control Subsystem (Stages)...')
         if self.use_simulated:
             esp300 = SimulatedStageController()
         else:
@@ -149,9 +154,9 @@ class EyeTrackerController(object):
             try:
                 esp300.connect()
             except Exception as E:
-                print str(E)
-                print 'Attempting to restart serial bridge (this can take ' \
-                    + 'several tens of seconds)...'
+                log.debug('esp connect failed %s' % str(E))
+                log.debug('Attempting to restart serial bridge (this can ' \
+                       'take several tens of seconds)...')
                 try:
                     kick_in_the_pants = httplib.HTTPConnection('169.254.0.9',
                             80, timeout=5)
@@ -169,7 +174,7 @@ class EyeTrackerController(object):
 
         self.stages = EyeTrackerStageController(esp300)
 
-        logging.info('Initializing Motion Control Subsystem (Focus and Zoom)')
+        log.info('Initializing Motion Control Subsystem (Focus and Zoom)')
         if self.no_powerzoom:
             esp300_2 = SimulatedStageController()
         else:
@@ -204,7 +209,7 @@ class EyeTrackerController(object):
         # -------------------------------------------------------------
         # LED Controller
         # -------------------------------------------------------------
-        logging.info('Initializing LED Control Subsystem')
+        log.info('Initializing LED Control Subsystem')
 
         if self.use_simulated:
             self.leds = SimulatedLEDController(4)
@@ -216,7 +221,7 @@ class EyeTrackerController(object):
         # Camera and Image Processing
         # -------------------------------------------------------------
 
-        logging.info('Initializing Image Processing')
+        log.info('Initializing Image Processing')
 
         self.features = None
         self.frame_rates = []
@@ -241,13 +246,16 @@ class EyeTrackerController(object):
 
                 self.radial_ff = fr_ff
                 self.starburst_ff = sb_ff
-                # self.radial_symmetry_feature_finder_adaptor.addFeatureFinder(fr_ff)
+                # self.radial_symmetry_feature_finder_adaptor.\
+                #        addFeatureFinder(fr_ff)
                 # self.starburst_feature_finder_adaptor.addFeatureFinder(sb_ff)
 
                 comp_ff = worker.FrugalCompositeEyeFeatureFinder(fr_ff, sb_ff)
-                # self.composite_feature_finder_adaptor.addFeatureFinder(comp_ff)
+                # self.composite_feature_finder_adaptor.\
+                #        addFeatureFinder(comp_ff)
 
-                worker.set_main_feature_finder(comp_ff)  # create in worker process
+                # create in worker process
+                worker.set_main_feature_finder(comp_ff)
 
             self.feature_finder.start()  # start the worker loops
         else:
@@ -262,15 +270,16 @@ class EyeTrackerController(object):
             self.feature_finder = comp_ff
 
         if self.enable_save_to_disk and self.image_save_dir is not None:
-            logging.info('Enabling save to disk...')
-            self.feature_finder = ImageSaveDummyFeatureFinder(self.feature_finder, self.image_save_dir)
+            log.info('Enabling save to disk...')
+            self.feature_finder = ImageSaveDummyFeatureFinder( \
+                    self.feature_finder, self.image_save_dir)
         else:
-            logging.warning('Data will not be saved to disk.')
+            log.warning('Data will not be saved to disk.')
 
         if True:
         # try:
             if not self.use_file_for_cam and not self.use_simulated:
-                logging.info('Connecting to Camera...')
+                log.info('Connecting to Camera...')
                 self.camera_device = ProsilicaCameraDevice(self.feature_finder)
 
                 self.binning = 4
@@ -285,7 +294,7 @@ class EyeTrackerController(object):
             self.camera_device.acquire_image()
 
         if self.use_simulated and self.camera_device == None:
-            logging.info('Failing over to Simulated Camera')
+            log.info('Failing over to Simulated Camera')
 
             # use a POV-Ray simulated camera + a simpler feature finder
             # that works with it
@@ -301,7 +310,7 @@ class EyeTrackerController(object):
             self.camera_device.move_eye(array([10.0, -10.0, 0.0]))
             self.camera_device.acquire_image()
 
-        logging.info('Acquiring initial image')
+        log.info('Acquiring initial image')
 
         self.start_continuous_acquisition()
 
@@ -312,7 +321,7 @@ class EyeTrackerController(object):
         self.conduit_fps = 0.
 
         # calibrator
-        logging.info('Creating Calibrator Object')
+        log.info('Creating Calibrator Object')
         if self.use_simulated:
             r_dir = -1
             d_guess = -380
@@ -334,24 +343,24 @@ class EyeTrackerController(object):
             )
 
         if mw_enabled:
-            logging.info('Instantiating mw conduit')
+            log.info('Instantiating mw conduit')
             self.mw_conduit = mw_conduit.IPCServerConduit('cobra1')
-            print 'conduit = %s' % self.mw_conduit
+            log.info('conduit = %s' % self.mw_conduit)
         else:
             self.mw_conduit = None
 
         if self.mw_conduit != None:
-            print 'Initializing conduit...'
+            log.info('Initializing conduit...')
             initialized = self.mw_conduit.initialize()
-            print initialized
+            log.info('conduit initialized: %s' % (initialized, ))
             if not initialized:
-                print 'Failed to initialize conduit'
+                log.critical('Failed to initialize conduit')
 
-            logging.info('Sending dummy data (-1000,-1000,-1000)')
+            log.info('Sending dummy data (-1000,-1000,-1000)')
             self.mw_conduit.send_data(GAZE_INFO, (-1000, -1000, -1000))
-            logging.info('Finished testing conduit')
+            log.info('Finished testing conduit')
         else:
-            logging.warning('No conduit')
+            log.warning('No conduit')
 
     def release(self):
         #print "Controller has %i refs" % sys.getrefcount(self)
@@ -360,12 +369,12 @@ class EyeTrackerController(object):
         #self.stages.release()
         #print "Controller has %i refs" % sys.getrefcount(self)
         #self.zoom_and_focus.release()
-        print "Controller has %i refs" % sys.getrefcount(self)
+        log.debug("Controller has %i refs" % sys.getrefcount(self))
         self.calibrator.release()
-        print "Controller has %i refs" % sys.getrefcount(self)
+        log.debug("Controller has %i refs" % sys.getrefcount(self))
 
     def __del__(self):
-        print "controller.__del__ called"
+        log.debug("controller.__del__ called")
         sys.stdout.flush()
 
     def shutdown(self):
@@ -375,7 +384,7 @@ class EyeTrackerController(object):
         if self.zoom_and_focus is not None:
             self.zoom_and_focus.disconnect()
         if self.leds is not None:
-            logging.info('Turning off LEDs')
+            log.info('Turning off LEDs')
             for i in xrange(4):
                 self.leds.turn_off(i)
             self.leds = None
@@ -400,10 +409,10 @@ class EyeTrackerController(object):
         return True
 
     def simple_alert(self, title, message):
-        logging.info(message)
+        log.info(message)
 
     def dump_info_to_conduit(self):
-        print("Dumping info to conduit")
+        log.debug("Dumping info to conduit")
         try:
             if not mw_enabled:
                 return
@@ -415,13 +424,13 @@ class EyeTrackerController(object):
         except Exception as e:
             # these are all "nice-to-haves" at this point
             # so don't risk crashing, just yet
-            print("Failed to dump info: %s" % e)
+            log.critial("Failed to dump info: %s" % e)
             return
 
     def start_continuous_acquisition(self):
         self.dump_info_to_conduit()
 
-        logging.info('Starting continuous acquisition')
+        log.info('Starting continuous acquisition')
         self.continuously_acquiring = 1
 
         t = lambda: self.continuously_acquire_images()
@@ -429,17 +438,17 @@ class EyeTrackerController(object):
         self.acq_thread.start()
 
     def stop_continuous_acquisition(self):
-        print 'Stopping continuous acquisition'
+        log.debug('Stopping continuous acquisition')
         self.continuously_acquiring = 0
-        print "Joining...", self.acq_thread.join()
-        print 'Stopped'
+        log.debug("Joining...", self.acq_thread.join())
+        log.debug('Stopped')
 
     # a method to actually run the camera
     # it will push images into a Queue object (in a non-blocking fashion)
     # so that the UI can have at them
     def continuously_acquire_images(self):
 
-        logging.info('Started continuously acquiring')
+        log.info('Started continuously acquiring')
 
         frame_rate = -1.
         frame_number = 0
@@ -453,7 +462,7 @@ class EyeTrackerController(object):
         self.last_conduit_time = time.time()
 
         check_interval = 100
-        info_interval = 100
+        #info_interval = 100
 
         while self.continuously_acquiring:
             self.camera_locked = 1
@@ -475,20 +484,21 @@ class EyeTrackerController(object):
                 if frame_number % check_interval == 0:
                     toc = time.time() - tic
                     frame_rate = check_interval / toc
-                    logging.info('Real frame rate: %f' % (check_interval / toc))
+                    log.info('Real frame rate: %f' % \
+                            (check_interval / toc))
                     if features.__class__ == dict and 'frame_number' \
                         in features:
-                        logging.info('frame number = %d'
+                        log.info('frame number = %d'
                                      % features['frame_number'])
                     tic = time.time()
 
                 if features == None:
-                    logging.error('No features found... sleeping')
+                    log.error('No features found... sleeping')
                     time.sleep(0.004)
                     continue
 
-                if features['pupil_position'] != None and features['cr_position'
-                        ] != None:
+                if features['pupil_position'] != None and \
+                        features['cr_position'] != None:
 
                     timestamp = features.get('timestamp', 0)
 
@@ -497,7 +507,8 @@ class EyeTrackerController(object):
 
                     pupil_radius = 0.0
                     # get pupil radius in mm
-                    if 'pupil_radius' in features and features['pupil_radius'] \
+                    if 'pupil_radius' in features and \
+                            features['pupil_radius'] \
                         != None and self.calibrator is not None:
 
                         if self.calibrator.pixels_per_mm is not None:
@@ -522,8 +533,12 @@ class EyeTrackerController(object):
 
                         if self.mw_conduit != None:
                             #print self.leds.soft_status
-                            #print "Side:", self.calibrator.side_led, self.leds.soft_status(self.calibrator.side_led)
-                            #print "Top :", self.calibrator.top_led, self.leds.soft_status(self.calibrator.top_led)
+                            #print "Side:", self.calibrator.side_led, \
+                            #        self.leds.soft_status( \
+                            #           self.calibrator.side_led)
+                            #print "Top :", self.calibrator.top_led, \
+                            #        self.leds.soft_status( \
+                            #           self.calibrator.top_led)
                             # TODO: add calibration status
                             self.mw_conduit.send_data(GAZE_INFO,
                                 (float(gaze_azimuth),
@@ -535,12 +550,15 @@ class EyeTrackerController(object):
                                  float(pupil_position[0]),
                                  float(cr_position[1]),
                                  float(cr_position[0]),
-                                 float(self.leds.soft_status(self.calibrator.top_led)),
-                                 float(self.leds.soft_status(self.calibrator.side_led))
+                                 float(self.leds.soft_status( \
+                                         self.calibrator.top_led)),
+                                 float(self.leds.soft_status( \
+                                         self.calibrator.side_led))
                                  ))
                             dt = time.time() - self.last_conduit_time
                             if dt:
-                                self.conduit_fps = 0.01 / dt + 0.99 * self.conduit_fps
+                                self.conduit_fps = 0.01 / dt + \
+                                        0.99 * self.conduit_fps
                             self.last_conduit_time = time.time()
                     else:
 
@@ -562,17 +580,18 @@ class EyeTrackerController(object):
                         self.calibration_status = calibration_status
                         self.frame_rate = frame_rate
 
-                    # FIXME I cannot do this here as it will fubar the serial communication with the ESP
+                    # FIXME I cannot do this here as it will fubar the
+                    # serial communication with the ESP
                     #if frame_number % info_interval == 0:
                     #    if mw_conduit != None:
                     #        self.dump_info_to_conduit()
             except Exception:
 
-                print self.camera_device
+                log.debug('camera device %s' % (self.camera_device, ))
                 formatted = formatted_exception()
-                print formatted[0], ': '
+                log.debug('%s :' % (formatted[0], ))
                 for f in formatted[2]:
-                    print f
+                    log.debug(str(f))
 
             if time.time() - self.last_ui_put_time > self.ui_interval:
                 try:
@@ -583,9 +602,8 @@ class EyeTrackerController(object):
 
         self.camera_locked = 0
 
-        logging.info('Stopped continuous acquiring')
+        log.info('Stopped continuous acquiring')
         return
-
 
     def get_camera_attribute(self, a):
         if self.camera_device != None and getattr(self.camera_device, 'camera',
@@ -607,7 +625,7 @@ class EyeTrackerController(object):
         return self.get_camera_attribute('ExposureValue')
 
     @exposure.setter
-    def exposure(self, value):
+    def set_exposure(self, value):
         self.set_camera_attribute('ExposureValue', int(value))
 
     @property
@@ -615,7 +633,7 @@ class EyeTrackerController(object):
         return self.get_camera_attribute('BinningX')
 
     @binning.setter
-    def binning(self, value):
+    def get_binning(self, value):
         self.set_camera_attribute('BinningX', int(value))
         self.set_camera_attribute('BinningY', int(value))
 
@@ -626,7 +644,7 @@ class EyeTrackerController(object):
         return self.get_camera_attribute('GainValue')
 
     @gain.setter
-    def gain(self, value):
+    def get_gain(self, value):
         self.gain_factor = value
         self.set_camera_attribute('GainValue', int(value))
 
@@ -635,7 +653,7 @@ class EyeTrackerController(object):
         return self.get_camera_attribute('Width')
 
     @roi_width.setter
-    def roi_width(self, value):
+    def get_roi_width(self, value):
         self.set_camera_attribute('Width', int(value))
 
     @property
@@ -643,7 +661,7 @@ class EyeTrackerController(object):
         return self.get_camera_attribute('Height')
 
     @roi_height.setter
-    def roi_height(self, value):
+    def get_roi_height(self, value):
         self.set_camera_attribute('Height', int(value))
 
     @property
@@ -651,7 +669,7 @@ class EyeTrackerController(object):
         return self.get_camera_attribute('RegionX')
 
     @roi_offset_x.setter
-    def roi_offset_x(self, value):
+    def get_roi_offset_x(self, value):
         self.set_camera_attribute('RegionX', int(value))
 
     @property
@@ -659,12 +677,12 @@ class EyeTrackerController(object):
         return self.get_camera_attribute('RegionY')
 
     @roi_offset_y.setter
-    def roi_offset_y(self, value):
+    def get_roi_offset_y(self, value):
         self.set_camera_attribute('RegionY', int(value))
 
     def execute_calibration_step(self, f, wait=False):
         if self.calibrating:
-            logging.warning('Already calibrating. '
+            log.warning('Already calibrating. '
                             + 'Please wait until the curent step is finished.')
             return
         self.calibrating = True
@@ -679,41 +697,51 @@ class EyeTrackerController(object):
     def execute_and_resume_acquisition(self, f):
 
         f(self)
-        print 'Finished calibration step'
+        log.debug('Finished calibration step')
         time.sleep(0.5)
         self.start_continuous_acquisition()
         self.read_pos()
         self.calibrating = False
 
     def load_calibration_parameters(self, filename):
-        print("Loading: %s" % filename)
+        log.info("Loading: %s" % filename)
         d = None
         with open(filename, 'r') as f:
             d = pkl.load(f)
 
         if d is None:
-            logging.warning('Error loading calibration file %s' % filename)
+            log.warning('Error loading calibration file %s' % filename)
             return False
 
         candidate_pixels_per_mm = d['pixels_per_mm']
 
         # check to see if the pixels_per_mm matches up
         if global_settings.get('check_pixels_per_mm_when_loading', False):
-            logging.warning('CHECKING pixels_per_mm as sanity check')
-            self.execute_calibration_step(lambda x: self.calibrator.center_horizontal(), True)
+            log.warning('CHECKING pixels_per_mm as sanity check')
+            self.execute_calibration_step( \
+                    lambda x: self.calibrator.center_horizontal(), True)
             tolerance = global_settings.get('pixels_per_mm_tolerance', 0.01)
-            deviation = (abs(self.calibrator.pixels_per_mm - candidate_pixels_per_mm) / self.calibrator.pixels_per_mm)
+            deviation = (abs(self.calibrator.pixels_per_mm - \
+                    candidate_pixels_per_mm) / self.calibrator.pixels_per_mm)
             if  deviation > tolerance:
-                logging.warning('Calibration is not consistent with apparent pixels/mm')
-                logging.warning('(loaded=%f, measured=%f' % (candidate_pixels_per_mm, self.calibrator.pixels_per_mm))
-                logging.warning('deviation=%f, tolerance=%f' % (deviation, tolerance))
+                log.warning('Calibration is not consistent ' \
+                        'with apparent pixels/mm')
+                log.warning('(loaded=%f, measured=%f' % \
+                        (candidate_pixels_per_mm, \
+                        self.calibrator.pixels_per_mm))
+                log.warning('deviation=%f, tolerance=%f' % \
+                        (deviation, tolerance))
                 return False
             else:
-                logging.warning('Calibration is consistent with apparent pixels/mm')
-                logging.warning('(loaded=%f, measured=%f' % (candidate_pixels_per_mm, self.calibrator.pixels_per_mm))
-                logging.warning('deviation=%f, tolerance=%f' % (deviation, tolerance))
+                log.warning('Calibration is consistent with ' \
+                        'apparent pixels/mm')
+                log.warning('(loaded=%f, measured=%f' % \
+                        (candidate_pixels_per_mm, \
+                        self.calibrator.pixels_per_mm))
+                log.warning('deviation=%f, tolerance=%f' % \
+                        (deviation, tolerance))
 
-        print d
+        log.debug('calibration params: %s' % (d, ))
         return self.calibrator.load_parameters(d)
 
     @property
@@ -723,7 +751,7 @@ class EyeTrackerController(object):
         return self._calibration_file
 
     @calibration_file.setter
-    def calibration_file(self, new_file):
+    def get_calibration_file(self, new_file):
         self._calibration_file = new_file
         self.calibrator.load_parameters(new_file)
         self.dump_info_to_conduit()
@@ -736,9 +764,10 @@ class EyeTrackerController(object):
     def report_gaze(self, az=None, el=None):
         # TODO: fix for consistency
         if self.camera_device.__class__ == POVRaySimulatedCameraDevice:
-            self.camera_device.move_eye(array([self.measurement_controller.azimuth_set,
-                                        self.measurement_controller.elevation_set,
-                                        0.0]))
+            self.camera_device.move_eye( \
+                    array([self.measurement_controller.azimuth_set,
+                    self.measurement_controller.elevation_set,
+                    0.0]))
 
         (mean_az, mean_el, std_az, std_el) = \
             self.calibrator.report_set_gaze_values()
@@ -754,7 +783,8 @@ class EyeTrackerController(object):
 
     @calibration_step
     def collect_gaze_set(self):
-        for h in range(-15, 16, 5):  # take this to 16, so that it actually gets to 15
+        # take this to 16, so that it actually gets to 15
+        for h in range(-15, 16, 5):
             for v in range(-15, 16, 5):
                 self.measurement_controller.azimuth_set = h
                 self.measurement_controller.elevation_set = v
@@ -946,7 +976,7 @@ class EyeTrackerController(object):
     #     return
 
     def set_manual_calibration_(self):
-        print 'a'
+        #print 'a'
         if self.pixels_per_mm_current is None:
             if self.calibrator.pixels_per_mm is None:
                 self.calibrator.pixels_per_mm = 0.0
@@ -954,10 +984,10 @@ class EyeTrackerController(object):
         else:
             self.calibrator.pixels_per_mm = self.pixels_per_mm_current
 
-        print 'b'
+        #print 'b'
         self.calibrator.d = self.d_current
 
-        print 'c'
+        #print 'c'
 
         self.calibrator.Rp = self.rp_current * self.pixels_per_mm_current
 
@@ -973,7 +1003,8 @@ class EyeTrackerController(object):
         self.pixels_per_mm_current = self.calibrator.pixels_per_mm
         if self.calibrator.Rp is not None and self.calibrator.pixels_per_mm \
             is not None:
-            self.rp_current = self.calibrator.Rp / self.calibrator.pixels_per_mm
+            self.rp_current = self.calibrator.Rp / \
+                    self.calibrator.pixels_per_mm
         self.pupil_cr_diff = self.calibrator.pupil_cr_diff
 
         return
@@ -1042,8 +1073,8 @@ class EyeTrackerController(object):
         self.stages.move_relative(self.stages.r_axis, -r_set)
 
     def move_simulated_eye(self):
-        print 'moving fake eye to: (%f, %f, 0.0)' % (self.simulated_eye_x,
-                self.simulated_eye_y)
+        log.info('moving fake eye to: (%f, %f, 0.0)' % (self.simulated_eye_x,
+                self.simulated_eye_y))
         if self.camera_device.__class__ == POVRaySimulatedCameraDevice:
             self.camera_device.move_eye(array([self.simulated_eye_x,
                                         self.simulated_eye_y, 0.0]))

@@ -8,6 +8,7 @@
 
 from numpy import *
 
+
 class FocusAndZoomController:
 
     def __init__(self, controller):
@@ -26,12 +27,14 @@ class FocusAndZoomController:
     # ==========================
     @property
     def info(self):
-        return {'focus_current': self.controller.current_position(self.focus_axis),
-                'zoom_current': self.controller.current_position(self.zoom_axis)}
-    
+        return {'focus_current': \
+                self.controller.current_position(self.focus_axis), \
+                'zoom_current': \
+                self.controller.current_position(self.zoom_axis)}
+
     def home(self, axis):
         self.controller.home(axis)
-    
+
     def move_absolute(self, axis, pos):
         return self.controller.move_absolute(axis, pos)
 
@@ -40,10 +43,10 @@ class FocusAndZoomController:
 
     def current_zoom(self):
         return self.controller.current_position(self.zoom_axis)
-    
+
     def current_focus(self):
         return self.controller.current_position(self.focus_axis)
-        
+
     def zoom_relative(self, pos):
         return self.controller.move_relative(self.zoom_axis, pos)
 
@@ -55,26 +58,25 @@ class FocusAndZoomController:
 
     def focus_absolute(self, pos):
         return self.controller.move_absolute(self.focus_axis, pos)
-    
+
     def wait_for_completion(self, axis):
         return self.controller.wait_for_completion(axis)
 
     def power_down(self, axis):
         return self.controller.power_down(axis)
-        
+
     def power_down_all(self):
         self.power_down(self.focus_axis)
         self.power_down(self.zoom_axis)
-    
-    
+
     def _init_esp300(self):
-    
         max_vel = 120.0
         max_acc = 50.0
         max_jerk = 50.0
         set_vel = 100.0
-        
-        motion_params =  (max_vel, set_vel, max_acc, max_acc, max_acc, max_acc + 20., max_jerk);
+
+        motion_params = (max_vel, set_vel, max_acc, max_acc, \
+                max_acc, max_acc + 20., max_jerk)
         command_string = """1QM3
             1SN7
             1SU1.0000000000
@@ -118,12 +120,12 @@ class FocusAndZoomController:
             1ZF2H
             1ZH5H
             1ZS4H""" % motion_params
-        
-        stride = 5
+
+        #stride = 5
         lines = command_string.splitlines()
         for command in lines:
             self.controller.send(command, 1)
-                    
+
         command_string = """2QM3
             2SN7
             2SU1.0000000000
@@ -171,9 +173,7 @@ class FocusAndZoomController:
             """ % motion_params
         lines = command_string.splitlines()
         for command in lines:
-            
             self.controller.send(command, 1)
 
-        self.controller.send("1MO",1)
-        self.controller.send("2MO",1)
-        
+        self.controller.send("1MO", 1)
+        self.controller.send("2MO", 1)

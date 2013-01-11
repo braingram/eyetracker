@@ -13,6 +13,10 @@ import PIL.Image
 #import matplotlib.pylab as pylab
 import time
 
+from ..utils.loghelper import make_logger
+
+log = make_logger('camera')
+
 
 class POVRaySimulatedCameraDevice:
     def __init__(self, _feature_finder, _stages, _leds, _d, **kwargs):
@@ -69,16 +73,15 @@ class POVRaySimulatedCameraDevice:
         self.noise_level = kwargs.get("noise_level", 4.0)
 
     def acquire_image(self):
-        tic = time.time()
         x = self.stages.current_position(self.stages.x_axis)
         y = self.stages.current_position(self.stages.y_axis)
         r = self.stages.current_position(self.stages.r_axis)
 
         if not self.quiet:
-            print "====== Camera state-of-the-world ========"
-            print "x: %g" % x
-            print "y: %g" % y
-            print "r: %g" % r
+            log.debug("====== Camera state-of-the-world ========")
+            log.debug("x: %g" % x)
+            log.debug("y: %g" % y)
+            log.debug("r: %g" % r)
 
         l0 = self.leds.status(self.leds.channel2)
         l1 = self.leds.status(self.leds.channel1)
@@ -184,7 +187,7 @@ class POVRaySimulatedCameraDevice:
             command_string = "/usr/local/bin/povray " \
             "+O/tmp/eyeball.png +A +W%d +H%d /tmp/eyeball.pov" % \
             (self.w, self.h)
-            print "Command = " + command_string
+            log.debug("Command = " + command_string)
 
         os.popen(command_string)
 
@@ -236,4 +239,4 @@ class POVRaySimulatedCameraDevice:
     def set_pupil_radius(self, new_radius):
         self.pupil_radius = new_radius
         #self.Rp = sqrt(self.Rp_int**2 - new_radius**2)
-        print "Rp = %f, radius = %f" % (self.Rp, self.pupil_radius)
+        log.debug("Rp = %f, radius = %f" % (self.Rp, self.pupil_radius))

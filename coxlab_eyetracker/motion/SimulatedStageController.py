@@ -9,6 +9,11 @@
 import time
 import random
 
+from ..util.loghelper import make_logger
+
+log = make_logger('motion')
+
+
 class SimulatedStageController:
 
     x_axis = 0
@@ -17,39 +22,38 @@ class SimulatedStageController:
 
     def __init__(self):
         self.positions = [0.0, 0.0, 0.0]
-        
+
         flag_randomize_axes_location = False
-        if flag_randomize_axes_location: 
+        if flag_randomize_axes_location:
             random.seed(time.time())
-            self.positions[0] += random.uniform(-5,5)
-            self.positions[1] += random.uniform(-5,5)
-            self.positions[2] += random.uniform(-5,5)
-    
+            self.positions[0] += random.uniform(-5, 5)
+            self.positions[1] += random.uniform(-5, 5)
+            self.positions[2] += random.uniform(-5, 5)
+
     def setup(self):
         return
-    
+
     def send(self, message, dummy):
         return
-    
+
     def home(self, axis):
         self.positions[axis] = 0.0
-    
+
     def move_absolute(self, axis, pos):
-        print "Move absolute: Axis = ", axis, " Pos = ", pos
+        log.info("Move absolute: Axis = %s Pos = %s" % (axis, pos))
         self.positions[axis] = float(pos)
         time.sleep(.25)
-    
+
     def move_relative(self, axis, pos):
-        print "Move relative: Axis = ", axis, " Pos = ", pos
-        
+        log.info("Move relative: Axis = %s Pos = %s" % (axis, pos))
+
         self.positions[axis] += float(pos)
         time.sleep(.25)
-        
 
     def move_composite_absolute(self, axes, new_positions):
         for a in range(0, len(axes)):
             self.move_absolute(axes[a], new_positions[a])
-    
+
     def move_composite_relative(self, axes, new_positions):
         for a in range(0, len(axes)):
             self.move_relative(axes[a], new_positions[a])
@@ -62,4 +66,3 @@ class SimulatedStageController:
 
     def power_down(self, axis):
         return
-

@@ -6,8 +6,6 @@
 #  Copyright (c) 2008 Harvard University. All rights reserved.
 #
 
-import logging
-
 from math import *
 from numpy import *
 from scipy import *
@@ -15,6 +13,10 @@ import scipy.optimize
 from scipy import stats
 from Queue import Full
 import cPickle as pkl
+
+from ..util.loghelper import make_logger
+
+log = make_logger('calibrator')
 
 
 class StahlLikeCalibrator:
@@ -177,40 +179,40 @@ class StahlLikeCalibrator:
     def check_parameters(self, p):
         for k in ('stages', 'focus_zoom', 'calibrator'):
             if (k not in p):
-                logging.error("calibrator missing: %s" % k)
+                log.error("calibrator missing: %s" % k)
                 return False
         # check stages
         for k in ('x_current', 'y_current', 'r_current'):
             if (k not in p['stages']):
-                logging.error("calibrator missing: stages.%s" % k)
+                log.error("calibrator missing: stages.%s" % k)
                 return False
         for k in ('focus_current', 'zoom_current'):
             if (k not in p['focus_zoom']):
-                logging.error("calibrator missing: focus_zoom.%s" % k)
+                log.error("calibrator missing: focus_zoom.%s" % k)
                 return False
         for k in ('distance', 'Rp', 'Rp_mm', 'y_equator', 'y_topCR_ref', \
                 'pixels_per_mm', 'default_cr_top', 'default_cr_side'):
             if (k not in p['calibrator']):
-                logging.error("calibrator missing: calibrator.%s" % k)
+                log.error("calibrator missing: calibrator.%s" % k)
                 return False
         return True
 
     def set_parameters(self, parameters, controller):
         # check info
-        print "Checking parameters"
+        log.debug("Checking parameters")
         if not self.check_parameters(parameters):
             return False
         # stages_info = x_current, y_current, z_current
         # fz_info = focus_current, zoom_current
         # calibrator = ...
-        print "Moving stages"
+        log.debug("Moving stages")
         for a in ('x', 'y', 'r'):
             pos = parameters['stages']['%s_current' % a]
             ax = getattr(controller.stages, '%s_axis' % a)
             controller.stages.move_absolute(ax, pos)
             cpos = controller.stages.current_position(ax)
             if cpos - pos > 0.001:
-                logging.error("Failed to move %s_axis to %g: pos=%g" \
+                log.error("Failed to move %s_axis to %g: pos=%g" \
                     % (a, pos, cpos))
                 return False
         for a in ('focus', 'zoom'):
@@ -219,10 +221,10 @@ class StahlLikeCalibrator:
             controller.zoom_and_focus.move_absolute(ax, pos)
             cpos = controller.zoom_and_focus.current_position(ax)
             if cpos - pos > 0.001:
-                logging.error("Failed to move %s_axis to %g: pos=%g" \
+                log.error("Failed to move %s_axis to %g: pos=%g" \
                     % (a, pos, cpos))
                 return False
-        print "Setting parameters"
+        log.debug("Setting parameters")
         c = parameters['calibrator']
         self.d = c['distance']
         self.Rp = c['Rp']
@@ -233,7 +235,7 @@ class StahlLikeCalibrator:
         self.default_cr_positions[self.top_led] = c['default_cr_top']
         self.default_cr_positions[self.side_led] = c['default_cr_side']
         if self.Rp_mm != c['Rp_mm']:
-            logging.error("Calculated Rp_mm[%g] != loaded [%g]" % \
+            log.error("Calculated Rp_mm[%g] != loaded [%g]" % \
                     (self.Rp_mm, c['Rp_mm']))
             return False
         # print "Returning: %s" % (self.d != None and "
@@ -251,21 +253,21 @@ class StahlLikeCalibrator:
         return True
 
     def load_parameters(self, filename, controller):
-        print("Loading: %s" % filename)
+        log.debug("Loading: %s" % filename)
         d = None
         with open(filename, 'r') as f:
             d = pkl.load(f)
 
         if d is not None:
             if not self.set_parameters(d, controller):
-                logging.error("Failed to set calibration parameters in: %s" \
+                log.error("Failed to set calibration parameters in: %s" \
                     % filename)
                 return
             # turn on top led
             try:
                 self.leds.turn_on(self.top_led)
             except Exception as E:
-                logging.error("Failed to turn on top led: %s" % E)
+                log.error("Failed to turn on top led: %s" % E)
             controller.execute_calibration_step( \
                     lambda x: controller.dump_info_to_conduit(), True)
             #self.d = d['d']
@@ -275,7 +277,7 @@ class StahlLikeCalibrator:
             #self.pixels_per_mm = d['pixels_per_mm']
             #self.Rp_mm = self.Rp / self.pixels_per_mm
         else:
-            logging.error('Could not load calibration settings: %s' % filename)
+            log.error('Could not load calibration settings: %s' % filename)
 
     def report_set_gaze_values(self):
 
@@ -303,13 +305,13 @@ class StahlLikeCalibrator:
         # Convert pixel arrays to degree
         elevation, azimuth = self.transform(pupil_array, cr_array)
 
-        print "#########  Set of pupil measurements (deg): ##########\n"
-        print "Azimuth =\n", azimuth
-        print "Elevation =\n", elevation
+        log.debug("#########  Set of pupil measurements (deg): ##########\n")
+        log.debug("Azimuth =\n", azimuth)
+        log.debug("Elevation =\n", elevation)
 
-        print "#########  Set of top CR measurements (pix): ##########\n"
-        print "x =\n", cr_array[:, 0]
-        print "y =\n", cr_array[:, 1]
+        log.debug("#########  Set of top CR measurements (pix): ##########\n")
+        log.debug("x =\n", cr_array[:, 0])
+        log.debug("y =\n", cr_array[:, 1])
 
         return mean(azimuth), mean(elevation), std(azimuth), std(elevation)
 
@@ -371,22 +373,24 @@ class StahlLikeCalibrator:
             med_features['cr_position_array'] = cr_position
 
             if not self.quiet:
-                print "\n"
-                print "ARRAY cr position = ", cr_position
-                print "\n"
-                print "ARRAY cr position transposed = ", \
-                        cr_position.transpose()
-                print "\n"
-                print "MEDIAN pupil radius = ", median(pupil_radius)
-                print "MEDIAN cr radius = ", median(cr_radius)
-                print "MEDIAN pupil position = ", median(pupil_position, 0)
-                print "MEDIAN cr position = ", median(cr_position, 0)
-                print "\n"
-                print "LAST pupil radius = ", med_features['pupil_radius']
-                print "LAST cr radius = ", med_features['cr_radius']
-                print "LAST pupil position = ", med_features['pupil_position']
-                print "LAST cr position = ", med_features['cr_position']
-                print "\n"
+                log.debug("ARRAY cr position = %s" % (cr_position, ))
+                log.debug("ARRAY cr position transposed = %s" % \
+                        (cr_position.transpose(), ))
+                log.debug("MEDIAN pupil radius = %s" % \
+                        (median(pupil_radius), ))
+                log.debug("MEDIAN cr radius = %s" % (median(cr_radius), ))
+                log.debug("MEDIAN pupil position = %s" % \
+                        (median(pupil_position, 0), ))
+                log.debug("MEDIAN cr position = %s" % \
+                        (median(cr_position, 0), ))
+                log.debug("LAST pupil radius = %s" % \
+                        (med_features['pupil_radius'], ))
+                log.debug("LAST cr radius = %s" % \
+                        (med_features['cr_radius'], ))
+                log.debug("LAST pupil position = %s" % \
+                        (med_features['pupil_position'], ))
+                log.debug("LAST cr position = %s" % \
+                        (med_features['cr_position'], ))
         else:
             med_features = None
             raise Exception("Features median (average) could not be " \
@@ -396,8 +400,8 @@ class StahlLikeCalibrator:
             try:
                 self.ui_queue.put_nowait(med_features)
                 #print "!@#$!@#$!@#$!@#$!@#$ used median features"
-            except Full, e:
-                print "Calibrator: unable to communicate with GUI"
+            except Full:
+                log.error("Calibrator: unable to communicate with GUI")
                 pass
 
         return med_features
@@ -420,8 +424,8 @@ class StahlLikeCalibrator:
         if(self.ui_queue != None):
             try:
                 self.ui_queue.put_nowait(avg_features)
-            except Full, e:
-                print "Calibrator: unable to communicate with GUI"
+            except Full:
+                log.error("Calibrator: unable to communicate with GUI")
                 pass
 
         return avg_features
@@ -460,23 +464,23 @@ class StahlLikeCalibrator:
             coordinates to degrees"""
 
         # calibrate the eye tracker in five steps
-        print "CENTER HORIZONTAL"
+        log.debug("CENTER HORIZONTAL")
         self.center_horizontal()
 
-        print "CENTER VERTICAL"
+        log.debug("CENTER VERTICAL")
         self.center_vertical()
 
-        print "CENTER DEPTH"
+        log.debug("CENTER DEPTH")
         self.center_depth_faster()
 
         #print "ALIGN PUPIL AND CR"
         #self.align_pupil_and_CR()
 
-        print "FIND PUPIL RADIUS"
+        log.debug("FIND PUPIL RADIUS")
         self.find_pupil_radius()
 
-        print "d = ", self.d
-        print "Rp[mm] = ", self.Rp_mm
+        log.debug("d = %s" % (self.d, ))
+        log.debug("Rp[mm] = %s" % (self.Rp_mm, ))
 
     def transform(self, pupil_coordinates, cr_coordinates):
         """Convert image (pixel) coordinates to degrees of visual angle"""
@@ -554,7 +558,7 @@ class StahlLikeCalibrator:
 
     def center_horizontal(self):
         """Horizontally align the camera with the eye"""
-        print "Calibrator: centering horizontal"
+        log.debug("Calibrator: centering horizontal")
         self.center_axis(self.x_stage_axis)
 
         # Save the position of the CR spot with the light on the top:
@@ -609,18 +613,18 @@ class StahlLikeCalibrator:
         original_pupil = features["pupil_position"]
 
         if self.center_camera_frame is not None:
-            print "ALIGN TO THE CENTER OF CAMERA FRAME"
+            log.debug("ALIGN TO THE CENTER OF CAMERA FRAME")
             im_center = self.center_camera_frame
         else:
-            print "ALIGN TO THE CENTER OF ACQUIRED IMAGE"
+            log.debug("ALIGN TO THE CENTER OF ACQUIRED IMAGE")
             #im_shape = features["im_shape"]
             im_center = array(self.camera.im_array.shape) / 2.
 
         self.y_equator = im_center[self.y_image_axis]
 
-        print("ORIGINAL CR POSITION = %f, %f" % tuple(original_cr))
-        print("ORIGINAL PUPIL POSITION = %f, %f" % tuple(original_pupil))
-        print("IMAGE CENTER = %f, %f" % tuple(im_center))
+        log.debug("ORIGINAL CR POSITION = %f, %f" % tuple(original_cr))
+        log.debug("ORIGINAL PUPIL POSITION = %f, %f" % tuple(original_pupil))
+        log.debug("IMAGE CENTER = %f, %f" % tuple(im_center))
 
         # 3. Move the stage towards the center in the {X|Y} direction
         Dx_sign = 1.
@@ -629,15 +633,15 @@ class StahlLikeCalibrator:
         Dx_actual = stage_direction * Dx_sign * Dx
 
         if not self.quiet:
-            print "Axis original position:", \
-                    self.stages.current_position(stage_axis)
-            print "planned displacement:", Dx_actual
+            log.debug("Axis original position: %s" % \
+                    (self.stages.current_position(stage_axis), ))
+            log.debug("planned displacement: %s" % (Dx_actual, ))
 
         self.stages.move_relative(stage_axis,  Dx_actual)
 
         if not self.quiet:
-            print "Axis new position:", \
-                    self.stages.current_position(stage_axis)
+            log.debug("Axis new position: %s" % \
+                    (self.stages.current_position(stage_axis), ))
 
         # 4. Get the CR and Pupil Positions again
         features = self.acquire_averaged_features(self.n_calibration_samples)
@@ -645,12 +649,12 @@ class StahlLikeCalibrator:
         cr = features["cr_position"]
         pupil = features["pupil_position"]
 
-        print("CR POSITION = %f, %f" % tuple(cr))
-        print("PUPIL POSITION = %f, %f" % tuple(pupil))
+        log.debug("CR POSITION = %f, %f" % tuple(cr))
+        log.debug("PUPIL POSITION = %f, %f" % tuple(pupil))
 
         # 5. Compute the slope (pixels / mm)
         slope = (cr[im_axis] - original_cr[im_axis]) / Dx_actual
-        print("Slope = %f" % slope)
+        log.debug("Slope = %f" % slope)
 
         self.pixels_per_mm = abs(slope)
 
@@ -658,13 +662,13 @@ class StahlLikeCalibrator:
         Dx_actual = stage_direction * (cr[im_axis] - \
                 im_center[im_axis]) / slope
         if not self.quiet:
-            print "planned displacement:", Dx_actual
+            log.debug("planned displacement: %s" % (Dx_actual, ))
         #self.stages.move_relative(stage_axis, self.x_stage_direction * \
         #        (im_center[im_axis] - cr[im_axis]) / slope) # Dave's
         self.stages.move_relative(stage_axis, Dx_actual)
         if not self.quiet:
-            print "Axis final position:", \
-                    self.stages.current_position(stage_axis)
+            log.debug("Axis final position: %s" % \
+                    (self.stages.current_position(stage_axis), ))
 
         # 7. (Optional) Report the CR and Pupil Positions,
         # as well as the stage position not right now
@@ -672,8 +676,9 @@ class StahlLikeCalibrator:
 
         self.default_cr_positions[chosen_led] = features["cr_position"]
 
-        print("FINAL CR POSITION = %f, %f" % tuple(features["cr_position"]))
-        print("FINAL PUPIL POSITION = %f, %f" % \
+        log.debug("FINAL CR POSITION = %f, %f" % \
+                tuple(features["cr_position"]))
+        log.debug("FINAL PUPIL POSITION = %f, %f" % \
                 tuple(features["pupil_position"]))
 
         return
@@ -704,9 +709,9 @@ class StahlLikeCalibrator:
         self.zoom_factor = params[0]
 
         self.center_horizontal()
-        print "Before: %g, After: %g" % \
-                (pixels_per_mm_measured[0], self.pixels_per_mm)
-        print "Zoom factor: %g" % (self.zoom_factor)
+        log.debug("Before: %g, After: %g" % \
+                (pixels_per_mm_measured[0], self.pixels_per_mm))
+        log.debug("Zoom factor: %g" % (self.zoom_factor))
 
     def _jogged_cr_difference(self, d, rs, axis):
 
@@ -720,9 +725,11 @@ class StahlLikeCalibrator:
             cr_pos.append(features["cr_position"])
             reversal_function()
 
-        print "########## in _jogged_cr_difference:"
-        print "cr pos 1st =", cr_pos[0][axis], "cr pos 2nd =", cr_pos[1][axis]
-        print "DIFFERENCE CRs =", cr_pos[0][axis] - cr_pos[1][axis]
+        log.debug("########## in _jogged_cr_difference:")
+        log.debug("cr pos 1st = %s cr pos 2nd = %s" % \
+                (cr_pos[0][axis], cr_pos[1][axis]))
+        log.debug("DIFFERENCE CRs = %s" % \
+                (cr_pos[0][axis] - cr_pos[1][axis], ))
         return cr_pos[0][axis] - cr_pos[1][axis]
 
     def _jogged_pupil_cr_difference(self, d, r, axis):
@@ -734,9 +741,11 @@ class StahlLikeCalibrator:
         pupil_pos = features["pupil_position"]
         reversal_function()
 
-        print "########## in _jogged_pupil_cr_difference:"
-        print "cr pos =", cr_pos[axis], "pupil pos =", pupil_pos[axis]
-        print "DIFFERENCE CR - PUPIL =", cr_pos[axis] - pupil_pos[axis]
+        log.debug("########## in _jogged_pupil_cr_difference:")
+        log.debug("cr pos = %s pupil pos= %s" % \
+                (cr_pos[axis], pupil_pos[axis]))
+        log.debug("DIFFERENCE CR - PUPIL = %s" % \
+                (cr_pos[axis] - pupil_pos[axis], ))
         return cr_pos[axis] - pupil_pos[axis]
 
     def center_depth_faster(self):
@@ -745,7 +754,7 @@ class StahlLikeCalibrator:
         data to find the zero point in a hurry
         """
 
-        print "Centering depth (faster)"
+        log.debug("Centering depth (faster)")
         # 1. Turn on the top LED, turn off the side LED
         self.leds.turn_on(self.top_led)
         self.leds.turn_off(self.side_led)
@@ -799,8 +808,8 @@ class StahlLikeCalibrator:
         # return to our original position
         return_motion()
 
-        print "ds = ", ds
-        print "cr_diffs = ", array(measured_cr_displacements)
+        log.debug("ds = %s" % (ds, ))
+        log.debug("cr_diffs = %s" % (array(measured_cr_displacements), ))
 
         X = hstack((array([ds]).T, ones_like(array([ds]).T)))
         cr_diff_vector = array([measured_cr_displacements]).T
@@ -808,9 +817,7 @@ class StahlLikeCalibrator:
         params = dot(linalg.pinv(X), cr_diff_vector)
         self.d = double(-params[1] / params[0])
 
-        print("=====================================")
-        print("D (faster) = %f" % self.d)
-        print("=====================================")
+        log.debug("D (faster) = %f" % self.d)
 
     def center_depth(self):
         """"
@@ -840,15 +847,13 @@ class StahlLikeCalibrator:
                 self.cr_diff_threshold, 30)
 
         self.d = self.d[0]
-        print("=====================================")
-        print("D = %f" % self.d)
-        print("=====================================")
+        log.debug("D = %f" % self.d)
 
     def sharpness_objective(self, abs_focus):
         self.focus_and_zoom.focus_absolute(abs_focus)
         features = self.acquire_averaged_features(4)
         sharpness = -features["sobel_avg"]
-        print "Sharpness: ", sharpness
+        log.debug("Sharpness: %s" % (sharpness, ))
         return sharpness
 
     def autofocus(self):
@@ -949,11 +954,9 @@ class StahlLikeCalibrator:
         cr_pos = features["cr_position"]
         pupil_pos = features["pupil_position"]
 
-        print("=====================================")
-        print "Final CR position =", cr_pos
-        print "Final Pupil position =", pupil_pos
-        print("D = ", self.d)
-        print("=====================================")
+        log.debug("Final CR position = %s" % (cr_pos, ))
+        log.debug("Final Pupil position = %s" % (pupil_pos, ))
+        log.debug("D = ", self.d)
 
         return
 
@@ -971,9 +974,9 @@ class StahlLikeCalibrator:
 
         self.pupil_cr_diff = cr_pos[self.x_image_axis] - \
                 pupil_pos[self.x_image_axis]
-        print "cr pos =", cr_pos[self.x_image_axis], "pupil pos =", \
-                pupil_pos[self.x_image_axis]
-        print "DIFFERENCE CR - PUPIL =", self.pupil_cr_diff
+        log.debug("cr pos = %s pupil pos = %s" % \
+                (cr_pos[self.x_image_axis], pupil_pos[self.x_image_axis]))
+        log.debug("DIFFERENCE CR - PUPIL = %s" % (self.pupil_cr_diff, ))
 
     def find_pupil_radius(self):
         """
@@ -1021,7 +1024,7 @@ class StahlLikeCalibrator:
         for i in range(0, len(precomputed_motions)):
             precomputed_motion = precomputed_motions[i]
             distance = true_distances[i]
-            print "-----> distance =", distance
+            log.debug("-----> distance = %s" % (distance, ))
 
             # take one measurement
             precomputed_motion()
@@ -1033,7 +1036,8 @@ class StahlLikeCalibrator:
             relative_magnification = distance / self.d
             #relative_magnification = 1.
             #relative_magnification = 1.012
-            print "relative_magnification =", relative_magnification
+            log.debug("relative_magnification = %s" % \
+                    (relative_magnification, ))
 
             displacement = (cr_pos[self.x_image_axis] - \
                     pupil_pos[self.x_image_axis]) * relative_magnification
@@ -1065,9 +1069,7 @@ class StahlLikeCalibrator:
                 y_displacement)
         self.Rp_mm = self.Rp / self.pixels_per_mm
 
-        print("=====================================")
-        print("Rp = ", self.Rp)
-        print("=====================================")
+        log.debug("Rp = %s" % (self.Rp, ))
 
         # 4. Turn back on the top LED to prepare for eye tracking
         self.leds.turn_on(self.top_led)
@@ -1080,22 +1082,22 @@ class StahlLikeCalibrator:
 
         #pupil_radius = features["pupil_radius"]
 
-        print pup_radiuses
+        log.debug("pup_radiuses %s" % (pup_radiuses, ))
         pupil_radius = mean(pup_radiuses)
 
         cornea_curvature_radius = sqrt(pupil_radius ** 2 + self.Rp ** 2)
-        print("================ EYE MEASUREMENTS IN PIXELS =================")
-        print("pupil size = ", pupil_radius)
-        print("Rp = ", self.Rp)
-        print("Cornea curvature radius = ", cornea_curvature_radius)
-        print("=====================================")
+        log.debug("============== EYE MEASUREMENTS IN PIXELS ===============")
+        log.debug("pupil size = %s" % (pupil_radius, ))
+        log.debug("Rp = %s" % (self.Rp, ))
+        log.debug("Cornea curvature radius = %s" % (cornea_curvature_radius, ))
+        log.debug("=====================================")
 
-        print("================== EYE MEASUREMENTS IN MM ===================")
-        print("pupil size = ", pupil_radius / self.pixels_per_mm)
-        print("Rp = ", self.Rp / self.pixels_per_mm)
-        print("Cornea curvature radius = ", \
-                cornea_curvature_radius / self.pixels_per_mm)
-        print("=====================================")
+        log.debug("================ EYE MEASUREMENTS IN MM =================")
+        log.debug("pupil size = %s" % (pupil_radius / self.pixels_per_mm, ))
+        log.debug("Rp = %s" % (self.Rp / self.pixels_per_mm, ))
+        log.debug("Cornea curvature radius = %s" % \
+                (cornea_curvature_radius / self.pixels_per_mm, ))
+        log.debug("=====================================")
         return
 
     def _compute_Rp(self, x_displacements, angle_displacements, \
@@ -1110,8 +1112,8 @@ class StahlLikeCalibrator:
         Rp_prime = p[0]
         angle_offset = p[1]
 
-        print("Rp_prime = %g" % Rp_prime)
-        print("Angle Offset = %g" % angle_offset)
+        log.debug("Rp_prime = %g" % Rp_prime)
+        log.debug("Angle Offset = %g" % angle_offset)
 
         # now correct Rp taking this vertical offset into account
         return sqrt(Rp_prime ** 2 + y_displacement ** 2)
@@ -1138,9 +1140,9 @@ class StahlLikeCalibrator:
         features = self.acquire_averaged_features(self.n_calibration_samples)
         cr_pos_side = features["cr_position"]
 
-        print "INITIAL ZOOM"
-        print "CR top =", cr_pos_top
-        print "CR side =", cr_pos_side
+        log.debug("INITIAL ZOOM")
+        log.debug("CR top = %s" % (cr_pos_top, ))
+        log.debug("CR side = %s" % (cr_pos_side, ))
 
         # 2) Change the focus and measure again the CR position (top and side)
         self.focus_and_zoom.zoom_relative(zoom_step)
@@ -1155,9 +1157,9 @@ class StahlLikeCalibrator:
         features = self.acquire_averaged_features(self.n_calibration_samples)
         cr_pos_side_zoom = features["cr_position"]
 
-        print "FINAL ZOOM"
-        print "CR top =", cr_pos_top_zoom
-        print "CR side =", cr_pos_side_zoom
+        log.debug("FINAL ZOOM")
+        log.debug("CR top = %s" % (cr_pos_top_zoom, ))
+        log.debug("CR side = %s" % (cr_pos_side_zoom, ))
 
         # Find the straight lines through the pairs of top and side CR values
         m_top = (cr_pos_top_zoom[0] - cr_pos_top[0]) / \
@@ -1172,7 +1174,8 @@ class StahlLikeCalibrator:
         y_cross = p_top + m_top * x_cross
 
         self.center_camera_frame = array([y_cross, x_cross])
-        print "CENTER OF THE CAMERA FRAME =", self.center_camera_frame
+        log.debug("CENTER OF THE CAMERA FRAME = %s" % \
+                (self.center_camera_frame, ))
 
     def fit_pupil_radius_size(self):
         """

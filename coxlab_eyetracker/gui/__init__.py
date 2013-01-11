@@ -11,12 +11,16 @@ import sys
 import re
 from coxlab_eyetracker.settings import global_settings
 
-import logging
-
 try:
     from collections import OrderedDict
 except:
     from ordereddict import OrderedDict
+
+
+from ..util.loghelper import make_logger
+
+
+log = make_logger('gui')
 
 
 # Utility functions for use with atb
@@ -546,8 +550,8 @@ class EyeTrackerGUI:
                                     self.save_calibration_file_atb( \
                                     self.cal_file_save_name))
         except Exception as E:
-            logging.warning("Error setting calibration file list: %s" % E)
-            logging.warning("""Unable to use calibration-file saving
+            log.warning("Error setting calibration file list: %s" % E)
+            log.warning("""Unable to use calibration-file saving
                                infrastructure.  A patched version of glumpy
                                is required to enable this feature.""")
 
@@ -658,10 +662,10 @@ class EyeTrackerGUI:
         def on_key_press(symbol, modifiers):
             if symbol == glumpy.key.ESCAPE:
                 c.stop_continuous_acquisition()
-                print "Controller has %i refs" % sys.getrefcount(c)
+                log.debug("Controller has %i refs" % sys.getrefcount(c))
                 c.release()
                 self.controller = None
-                print "Controller has %i refs" % sys.getrefcount(c)
+                log.debug("Controller has %i refs" % sys.getrefcount(c))
                 c.shutdown()
                 #print "Shutting down controller..."
                 #print "Shut down controller", c.shutdown()
@@ -674,7 +678,7 @@ class EyeTrackerGUI:
         self.window.draw()
 
     def __del__(self):
-        print "GUI __del__ called"
+        log.debug("GUI __del__ called")
         self.controller.stop_continuous_acquisition()
         self.controller.release()
         self.controller.shutdown()
@@ -712,9 +716,9 @@ class EyeTrackerGUI:
         try:
             cal_path = os.path.expanduser(global_settings['calibration_path'])
         except KeyError:
-            logging.warning(\
+            log.warning(\
                     'A calibration_path was not found in the config file')
-            logging.warning('Loaded global settings: %s' % global_settings)
+            log.warning('Loaded global settings: %s' % global_settings)
 
         if not os.path.exists(cal_path):
             os.makedirs(cal_path)
@@ -733,8 +737,8 @@ class EyeTrackerGUI:
         self.cal_enum_dict = OrderedDict(zip(cal_names, cal_ids))
         self.cal_lookup_dict = OrderedDict(zip(cal_ids, cal_names))
 
-        print self.cal_enum_dict
-        print self.cal_lookup_dict
+        log.debug("cal_enum_dict: %s" % (self.cal_enum_dict, ))
+        log.debug("cal_lookup_dict: %s" % (self.cal_lookup_dict, ))
 
         self.cal_enum = atb.enum('CalibrationFile', self.cal_enum_dict)
 
