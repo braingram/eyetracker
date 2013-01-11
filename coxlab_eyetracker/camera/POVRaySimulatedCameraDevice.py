@@ -6,14 +6,16 @@
 #  Copyright (c) 2008 __MyCompanyName__. All rights reserved.
 #
 
-import coxlab_eyetracker.util.Povray as pov
+from ..util import Povray as pov
 from numpy import *
 import os
 import PIL.Image
 #import matplotlib.pylab as pylab
 import time
 
-from ..utils.loghelper import make_logger
+#from .. import util
+#from ..util import loghelper
+from ..util.loghelper import make_logger
 
 log = make_logger('camera')
 

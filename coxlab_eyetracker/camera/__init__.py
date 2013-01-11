@@ -1,7 +1,15 @@
-from POVRaySimulatedCameraDevice import *
-from FakeCameraDevice import *
+
+from FakeCameraDevice import FakeCameraDevice
+__all__ = ['FakeCameraDevice']
 
 try:
-    from ProsilicaCameraDevice import *
-except e:
+    from POVRaySimulatedCameraDevice import POVRaySimulatedCameraDevice
+    __all__.append('POVRaySimulatedCameraDevice')
+except:
+    pass
+
+try:
+    from ProsilicaCameraDevice import ProsilicaCameraDevice
+    __all__.append('ProsilicaCameraDevice')
+except:
     pass

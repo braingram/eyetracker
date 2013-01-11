@@ -1,23 +1,34 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from ctypes import *
+#from ctypes import *
+#import ctypes
+import cPickle as pickle
+import Queue
 import sys
+import threading
 
 import time
 import httplib
 
-from numpy import *
-from scipy import *
+#from numpy import *
+#from scipy import *
+import numpy
+#import scipy
 
-from coxlab_eyetracker.util import *
-
-from coxlab_eyetracker.image_processing import *
-from coxlab_eyetracker.camera import *
-from coxlab_eyetracker.led import *
-from coxlab_eyetracker.motion import *
-from coxlab_eyetracker.calibrator import *
-from settings import global_settings
+#from coxlab_eyetracker.util import *
+from . import util
+#from coxlab_eyetracker.image_processing import *
+from . import image_processing
+#from coxlab_eyetracker.camera import *
+from . import camera
+#from coxlab_eyetracker.led import *
+from . import led
+#from coxlab_eyetracker.motion import *
+from . import motion
+#from coxlab_eyetracker.calibrator import *
+from . import calibrator
+from .settings import global_settings
 
 
 from .util.loghelper import make_logger
@@ -25,7 +36,7 @@ from .util.loghelper import make_logger
 log = make_logger('controller')
 
 # load settings
-loaded_config = load_config_file('~/.eyetracker/config.ini')
+loaded_config = util.load_config_file('~/.eyetracker/config.ini')
 global_settings.update(loaded_config)
 
 log.info('global_settings %s' % (global_settings, ))
@@ -125,7 +136,7 @@ class EyeTrackerController(object):
 
         self.canvas_update_timer = None
 
-        self.ui_queue = Queue(2)
+        self.ui_queue = Queue.Queue(2)
 
         self.camera_locked = 0
         self.continuously_acquiring = 0
@@ -147,9 +158,9 @@ class EyeTrackerController(object):
 
         log.info('Initializing Motion Control Subsystem (Stages)...')
         if self.use_simulated:
-            esp300 = SimulatedStageController()
+            esp300 = motion.SimulatedStageController()
         else:
-            esp300 = ESP300StageController('169.254.0.9', 8001)
+            esp300 = motion.ESP300StageController('169.254.0.9', 8001)
 
             try:
                 esp300.connect()
@@ -169,22 +180,22 @@ class EyeTrackerController(object):
                                       "Attempts to 'kick' the serial bridge "
                                       + 'have failed.  '
                                       + 'Reverting to simulated mode.')
-                    esp300 = SimulatedStageController()
+                    esp300 = motion.SimulatedStageController()
                     self.use_simulated = True
 
-        self.stages = EyeTrackerStageController(esp300)
+        self.stages = motion.EyeTrackerStageController(esp300)
 
         log.info('Initializing Motion Control Subsystem (Focus and Zoom)')
         if self.no_powerzoom:
-            esp300_2 = SimulatedStageController()
+            esp300_2 = motion.SimulatedStageController()
         else:
             if self.use_simulated:
-                esp300_2 = SimulatedStageController()
+                esp300_2 = motion.SimulatedStageController()
             else:
-                esp300_2 = ESP300StageController('169.254.0.9', 8002)
+                esp300_2 = motion.ESP300StageController('169.254.0.9', 8002)
                 esp300_2.connect()
 
-        self.zoom_and_focus = FocusAndZoomController(esp300_2)
+        self.zoom_and_focus = motion.FocusAndZoomController(esp300_2)
 
         self.x_current = self.stages.current_position(self.stages.x_axis)
         self.y_current = self.stages.current_position(self.stages.y_axis)
@@ -212,9 +223,9 @@ class EyeTrackerController(object):
         log.info('Initializing LED Control Subsystem')
 
         if self.use_simulated:
-            self.leds = SimulatedLEDController(4)
+            self.leds = led.SimulatedLEDController(4)
         else:
-            self.leds = MightexLEDController('169.254.0.9', 8006)
+            self.leds = led.MightexLEDController('169.254.0.9', 8006)
             self.leds.connect()
 
         # -------------------------------------------------------------
@@ -236,7 +247,8 @@ class EyeTrackerController(object):
 
         if nworkers != 0:
 
-            self.feature_finder = PipelinedFeatureFinder(nworkers)
+            self.feature_finder = image_processing. \
+                    PipelinedFeatureFinder(nworkers)
             workers = self.feature_finder.workers
 
             for worker in workers:
@@ -259,10 +271,11 @@ class EyeTrackerController(object):
 
             self.feature_finder.start()  # start the worker loops
         else:
-            sb_ff = SubpixelStarburstEyeFeatureFinder()
-            fr_ff = FastRadialFeatureFinder()
+            sb_ff = image_processing.SubpixelStarburstEyeFeatureFinder()
+            fr_ff = image_processing.FastRadialFeatureFinder()
 
-            comp_ff = FrugalCompositeEyeFeatureFinder(fr_ff, sb_ff)
+            comp_ff = image_processing. \
+                    FrugalCompositeEyeFeatureFinder(fr_ff, sb_ff)
 
             self.radial_ff = fr_ff
             self.starburst_ff = sb_ff
@@ -271,7 +284,8 @@ class EyeTrackerController(object):
 
         if self.enable_save_to_disk and self.image_save_dir is not None:
             log.info('Enabling save to disk...')
-            self.feature_finder = ImageSaveDummyFeatureFinder( \
+            self.feature_finder = image_processing. \
+                    ImageSaveDummyFeatureFinder( \
                     self.feature_finder, self.image_save_dir)
         else:
             log.warning('Data will not be saved to disk.')
@@ -280,7 +294,8 @@ class EyeTrackerController(object):
         # try:
             if not self.use_file_for_cam and not self.use_simulated:
                 log.info('Connecting to Camera...')
-                self.camera_device = ProsilicaCameraDevice(self.feature_finder)
+                self.camera_device = camera. \
+                        ProsilicaCameraDevice(self.feature_finder)
 
                 self.binning = 4
                 self.gain = 1
@@ -289,7 +304,7 @@ class EyeTrackerController(object):
         #             self.use_file_for_cam = 1
 
         if self.use_file_for_cam:
-            self.camera_device = FakeCameraDevice(self.feature_finder,
+            self.camera_device = camera.FakeCameraDevice(self.feature_finder,
                     '/Users/davidcox/Desktop/albino2/Snapshot2.bmp')
             self.camera_device.acquire_image()
 
@@ -298,7 +313,7 @@ class EyeTrackerController(object):
 
             # use a POV-Ray simulated camera + a simpler feature finder
             # that works with it
-            self.camera_device = POVRaySimulatedCameraDevice(
+            self.camera_device = camera.POVRaySimulatedCameraDevice(
                 self.feature_finder,
                 self.stages,
                 self.leds,
@@ -307,7 +322,7 @@ class EyeTrackerController(object):
                 image_width=160,
                 image_height=120,
                 )
-            self.camera_device.move_eye(array([10.0, -10.0, 0.0]))
+            self.camera_device.move_eye(numpy.array([10.0, -10.0, 0.0]))
             self.camera_device.acquire_image()
 
         log.info('Acquiring initial image')
@@ -331,7 +346,7 @@ class EyeTrackerController(object):
             d_guess = 380
             # d_guess = 300 # use this with the rat and set d_halfrange=30
 
-        self.calibrator = StahlLikeCalibrator(
+        self.calibrator = calibrator.StahlLikeCalibrator(
             self.camera_device,
             self.stages,
             self.zoom_and_focus,
@@ -588,7 +603,7 @@ class EyeTrackerController(object):
             except Exception:
 
                 log.debug('camera device %s' % (self.camera_device, ))
-                formatted = formatted_exception()
+                formatted = util.formatted_exception()
                 log.debug('%s :' % (formatted[0], ))
                 for f in formatted[2]:
                     log.debug(str(f))
@@ -707,7 +722,7 @@ class EyeTrackerController(object):
         log.info("Loading: %s" % filename)
         d = None
         with open(filename, 'r') as f:
-            d = pkl.load(f)
+            d = pickle.load(f)
 
         if d is None:
             log.warning('Error loading calibration file %s' % filename)
@@ -763,9 +778,10 @@ class EyeTrackerController(object):
     @calibration_step
     def report_gaze(self, az=None, el=None):
         # TODO: fix for consistency
-        if self.camera_device.__class__ == POVRaySimulatedCameraDevice:
+        if self.camera_device.__class__ == image_processing. \
+                POVRaySimulatedCameraDevice:
             self.camera_device.move_eye( \
-                    array([self.measurement_controller.azimuth_set,
+                    numpy.array([self.measurement_controller.azimuth_set,
                     self.measurement_controller.elevation_set,
                     0.0]))
 
@@ -1075,16 +1091,17 @@ class EyeTrackerController(object):
     def move_simulated_eye(self):
         log.info('moving fake eye to: (%f, %f, 0.0)' % (self.simulated_eye_x,
                 self.simulated_eye_y))
-        if self.camera_device.__class__ == POVRaySimulatedCameraDevice:
-            self.camera_device.move_eye(array([self.simulated_eye_x,
+        if self.camera_device.__class__ == image_processing. \
+                POVRaySimulatedCameraDevice:
+            self.camera_device.move_eye(numpy.array([self.simulated_eye_x,
                                         self.simulated_eye_y, 0.0]))
             self.camera_device.set_pupil_radius(self.simulated_pupil_radius)
 
     def auto_validate(self):
-        vs = linspace(-15., 15., 3)
+        vs = numpy.linspace(-15., 15., 3)
         hs = vs
 
         for v in vs:
             for h in hs:
-                self.camera_device.move_eye(array([v, h, 0.0]))
+                self.camera_device.move_eye(numpy.array([v, h, 0.0]))
                 self.report_gaze(h, v)

@@ -24,25 +24,28 @@ prosilica_static_libs = [os.path.join(prosilica_sdk_lib, x) for x in
 
 if sys.platform == 'darwin':
     extra_link_args = ['-framework', 'CoreFoundation']
+    prosilica_module = Extension(
+        'coxlab_eyetracker.camera.prosilica._prosilica_cpp',
+        define_macros=[('_x64', '1'), ('_OSX', '1')],
+        include_dirs=['/usr/local/include', prosilica_sdk_inc] + \
+                numpy_inc_dirs,
+        libraries=['m', 'c', 'PvAPI', 'Imagelib'],
+        extra_link_args=extra_link_args,
+        library_dirs=['/usr/local/lib', prosilica_sdk_lib],
+        sources=prosilica_src_paths,
+        )
+    ext_modules = [prosilica_module, ]
 else:
     extra_link_args = []
+    ext_modules = []
 
-prosilica_module = Extension(
-    'coxlab_eyetracker.camera.prosilica._prosilica_cpp',
-    define_macros=[('_x64', '1'), ('_OSX', '1')],
-    include_dirs=['/usr/local/include', prosilica_sdk_inc] + numpy_inc_dirs,
-    libraries=['m', 'c', 'PvAPI', 'Imagelib'],
-    extra_link_args=extra_link_args,
-    library_dirs=['/usr/local/lib', prosilica_sdk_lib],
-    sources=prosilica_src_paths,
-    )
 
 setup(
     name='coxlab_eyetracker',
     version='dev',
     scripts=['scripts/coxlab_eyetracker'],
     include_package_data=True,
-    ext_modules=[prosilica_module],
+    ext_modules=ext_modules,
     packages=find_packages(exclude=['tests', 'scripts']),
     data_files=[(os.path.expanduser('~/.eyetracker'),
                 ['config/config.ini'])]

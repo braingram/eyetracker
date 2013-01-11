@@ -1,2 +1,4 @@
-from SimulatedLEDController import *
-from MightexLEDController import *
+from SimulatedLEDController import SimulatedLEDController
+from MightexLEDController import MightexLEDController
+
+__all__ = ['SimulatedLEDController', 'MightexLEDController']

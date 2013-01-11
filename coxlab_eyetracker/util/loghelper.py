@@ -11,7 +11,7 @@ import logging
 
 def make_logger(name):
     l = logging.getLogger(name)
-    if len(l) == 0:
+    if len(l.handlers) == 0:
         h = logging.StreamHandler()
         h.setFormatter(logging.Formatter(\
             '%(name)s:%(levelname)8s:%(asctime)s:%(filename)s:' \

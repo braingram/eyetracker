@@ -22,7 +22,7 @@ import time
 
 import threading
 
-from ..utils.loghelper import make_logger
+from ..util.loghelper import make_logger
 
 log = make_logger('camera')
 
